@@ -1,0 +1,4 @@
+backports.csv==1.0.6
+Flask==1.0.2
+pytz==2018.5
+typing==3.6.6
