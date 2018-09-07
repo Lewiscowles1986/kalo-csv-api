@@ -2,6 +2,7 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request, Response
 from uuid import uuid4
+from flask_json_multidict import get_json_multidict
 
 from hateoas.listing import genPagingInfo, genLinks
 from hateoas.link import link
@@ -9,31 +10,21 @@ from models.user import User
 from models.userlist import UserList
 from data.internal_csv import CSVFileReader
 from forms.user import UserForm
+from data.user import userHateoasLinks
 
 user = Blueprint('user', __name__)
 
 reader = CSVFileReader('users.csv')
 users = UserList(reader.getAll())
 
+def get_data(request):
+    return get_json_multidict(request) if request.is_json else request.form
 
-@user.route('/', methods=['GET'])
+@user.route('/', methods=['GET'], strict_slashes = False)
 def index():
-    total = users.getTotal()
-    limit = users.getLimit(request.args.get('limit'))
-    pages = users.getPages(limit, total)
-    page = users.getPage(request.args.get('page'), pages)
-    start = users.getStart(page, limit)
-    end = users.getEnd(start, limit, total)
-
-    # sort the results
-    columns = ['pk', 'name', 'skills']
-    column = request.args.get('sortby')
-    if column not in columns:
-        column = columns[0]
-    sortdesc = bool(request.args.get('order') == 'DESC')
-
-    results = users.getPagedResult(start, end, column, sortdesc)
-    count = len(results)
+    results, page, pages, limit, count, column, desc, total = users.getListing(
+        request.args.get('limit'), request.args.get('page'), 
+        request.args.get('sortby'), request.args.get('order'))
 
     return jsonify({
         "data": addUserLinks(results),
@@ -41,7 +32,7 @@ def index():
         "paging": genPagingInfo(total, limit, pages, count, page),
         "sort": {
             "sortby": column,
-            "sortdesc": sortdesc
+            "sortdesc": desc
         }
     })
 
@@ -61,9 +52,10 @@ def time(pk):
         return Response("User not found", 404)
 
 
-@user.route('/', methods=['POST'])
+@user.route('/', methods=['POST'], strict_slashes = False)
 def create():
-    form = UserForm(request.form)
+    form = UserForm(get_data(request))
+
     if form.validate():
         newUser = User(
             str(uuid4()), form.name.data, False, form.receive_marketing.data,
@@ -76,20 +68,17 @@ def create():
         return jsonify({
             "data":
             newUser.toDict(),
-            "links": [
-                link("/users/%s/time" % newUser.getPK(), "time", "GET"),
-                link("/users/", "listing", "GET")
-            ]
+            "links": userHateoasLinks(newUser)
         }), 201
 
-    return jsonify({"errors": form.errors.items()}), 400
+    return jsonify({"errors": list(form.errors.items())}), 400
 
 
-@user.route('/<string:pk>', methods=['PUT'])
+@user.route('/<string:pk>', methods=['PUT'], strict_slashes = False)
 def update(pk):
     try:
         user = users.getUser(pk=pk)
-        form = UserForm(request.form)
+        form = UserForm(get_data(request))
         if form.validate():
             user.changeName(form.name.data)
             user.changeMarketingPreferences(form.receive_marketing.data)
@@ -101,12 +90,9 @@ def update(pk):
             return jsonify({
                 "data":
                 user.toDict(),
-                "links": [
-                    link("/users/%s/time" % user.getPK(), "time", "GET"),
-                    link("/users/", "listing", "GET")
-                ]
+                "links": userHateoasLinks(user)
             }), 200
-        return jsonify({"errors": form.errors.items()}), 400
+        return jsonify({"errors": list(form.errors.items())}), 400
     except IndexError:
         return Response("User not found", 404)
 

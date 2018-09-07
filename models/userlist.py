@@ -13,6 +13,10 @@ class UserList(InMemoryListing):
         self._rows = list(
             filter(None, [_mapUsers(user) for user in list_csv_users]))
 
+    def getColumns(self):
+        """gets model columns that can be sortedon"""
+        return ['pk', 'skills', 'name']
+
     def getUser(self, pk=1):
         return self.getEntry(pk)
 

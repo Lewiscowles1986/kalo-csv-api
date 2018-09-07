@@ -7,13 +7,13 @@ app = Flask(__name__)
 app.secret_key = str(uuid4())
 app.config["WTF_CSRF_ENABLED"] = False
 
-app.register_blueprint(user, url_prefix='/users')
+app.register_blueprint(user, url_prefix='/users/')
 
 
 @app.route("/")
 def redirectToUsers():
-    return redirect("/users")
+    return redirect("/users/")
 
 
 if __name__ == "__main__":
-    app.run(debug=True, threaded=True)
+    app.run(debug=True, threaded=True, port=8080)

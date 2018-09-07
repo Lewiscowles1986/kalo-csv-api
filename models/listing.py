@@ -1,4 +1,8 @@
 class AbstractListing(object):
+    def getListing(self, limit, page):
+        """return a tuple of listing data and support information"""
+        raise RuntimeError("Implement please")
+
     def getTotal(self):
         """return the total number of records in a listing"""
         raise RuntimeError("this is an abstract listing")
@@ -55,6 +59,33 @@ class AbstractListing(object):
 
 class InMemoryListing(AbstractListing):
     _rows = []
+
+    def getColumns(self):
+        """gets model columns that can be sortedon"""
+        return ['pk']
+
+    def getSortingInfo(self, sortfield, sortdesc):
+        """retrieves sortinginfo from input"""
+        columns = self.getColumns()
+        column = columns[0] if sortfield not in columns else sortfield
+        sortdesc = bool(sortdesc == 'DESC')
+        return (column, sortdesc)
+
+    def getListing(self, _limit, _page, sortfield, sortdesc):
+        """get listing data"""
+        total = self.getTotal()
+        limit = self.getLimit(_limit)
+        pages = self.getPages(limit, total)
+        page = self.getPage(_page, pages)
+        start = self.getStart(page, limit)
+        end = self.getEnd(start, limit, total)
+
+        # sort the results
+        column, sortdesc = self.getSortingInfo(sortfield, sortdesc)
+
+        results = self.getPagedResult(start, end, column, sortdesc)
+        count = len(results)
+        return (results, page, pages, limit, count, column, sortdesc, total)
 
     def __init__(self):
         self._rows = []
